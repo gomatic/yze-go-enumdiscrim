@@ -126,3 +126,179 @@ func SameKind(a, b Segment) string {
 	}
 	return "different"
 }
+
+// modeDefault NAMES an existing mode rather than adding one: Mode still has
+// two inhabitants, so TwoWay above stays a two-way domain and stays silent.
+const modeDefault Mode = ModeRead
+
+// Defaulted steers on the named default; the domain is still two-way.
+func Defaulted(mode Mode) string {
+	if mode == modeDefault {
+		return "read"
+	}
+	return "write"
+}
+
+// KindAlias spells Kind by another name; the alias resolves to the same group.
+type KindAlias = Kind
+
+// Aliased discriminates the three-member group through the alias spelling.
+func Aliased(kind KindAlias) string {
+	if kind != KindDef { // want `discriminates Kind, a const group of 3 members`
+		return "generic"
+	}
+	return "definition"
+}
+
+// Parenthesised discriminates with both operands parenthesised.
+func Parenthesised(kind Kind) string {
+	if (kind) != (KindDef) { // want `discriminates Kind, a const group of 3 members`
+		return "generic"
+	}
+	return "definition"
+}
+
+// LeftHanded puts the constant on the LEFT of the comparison.
+func LeftHanded(kind Kind) string {
+	if KindDef != kind { // want `discriminates Kind, a const group of 3 members`
+		return "generic"
+	}
+	return "definition"
+}
+
+// anyKind reports whether any segment satisfies the predicate; the predicate's
+// body is a value the caller's condition is computed from.
+func anyKind(segments []Segment, matches func(Kind) bool) bool {
+	for _, segment := range segments {
+		if matches(segment.Kind) {
+			return true
+		}
+	}
+	return false
+}
+
+// takes reports its argument; a comparison passed to it is an argument, not a
+// test the condition performs.
+func takes(flag bool) bool { return flag }
+
+// NotSteering holds three comparisons that appear inside the condition without
+// steering it — a closure body, a call argument and a map index — beside a
+// sibling that does steer and IS reported.
+func NotSteering(segments []Segment, kind Kind, byKind map[bool]bool) string {
+	if anyKind(segments, func(k Kind) bool { return k == KindDef }) {
+		return "closure"
+	}
+	if takes(kind == KindDef) {
+		return "argument"
+	}
+	if byKind[kind == KindDef] {
+		return "index"
+	}
+	if kind == KindRef { // want `discriminates Kind, a const group of 3 members`
+		return "steering"
+	}
+	return "generic"
+}
+
+// Nested puts the same comparison inside an inner if whose enclosing condition
+// is a call: the inner if is a statement of its own and is reported exactly
+// once, never a second time for lexically sitting inside the outer condition.
+func Nested(kind Kind) string {
+	if takes(func() bool {
+		if kind == KindDef { // want `discriminates Kind, a const group of 3 members`
+			return true
+		}
+		return false
+	}()) {
+		return "nested"
+	}
+	return "generic"
+}
+
+// ChainExhaustive names every member of the group across its arms and ends in a
+// terminal fallback: nothing falls through, silently or otherwise.
+func ChainExhaustive(kind Kind) string {
+	if kind == KindDef {
+		return "definition"
+	} else if kind == KindRef {
+		return "reference"
+	} else if kind == KindRaw {
+		return "raw"
+	}
+	panic("unknown kind")
+}
+
+// ChainPartial leaves KindRaw unnamed, so KindRaw falls through — reported ONCE
+// at the head of the chain rather than once per arm.
+func ChainPartial(kind Kind) string {
+	if kind == KindDef { // want `discriminates Kind, a const group of 3 members`
+		return "definition"
+	} else if kind == KindRef {
+		return "reference"
+	}
+	return "generic"
+}
+
+// Disjunction names two members in ONE condition: one construct, one decision,
+// one finding.
+func Disjunction(kind Kind) string {
+	if kind == KindDef || kind == KindRef { // want `discriminates Kind, a const group of 3 members`
+		return "named"
+	}
+	return "generic"
+}
+
+// Negated tests through a ! and is still a test.
+func Negated(kind Kind) string {
+	if !(kind == KindDef) { // want `discriminates Kind, a const group of 3 members`
+		return "generic"
+	}
+	return "definition"
+}
+
+// ValueSpelled writes the member's VALUE instead of its name — the same
+// discrimination spelled worse, and reported alike.
+func ValueSpelled(kind Kind) string {
+	if kind != 0 { // want `discriminates Kind, a const group of 3 members`
+		return "generic"
+	}
+	return "definition"
+}
+
+// ConvertedSpelled converts the value to the type — same inhabitant again.
+func ConvertedSpelled(kind Kind) string {
+	if kind != Kind(0) { // want `discriminates Kind, a const group of 3 members`
+		return "generic"
+	}
+	return "definition"
+}
+
+// OffGroup compares against a value the group does not declare: no inhabitant
+// is named, so no member of the group is discriminated and nothing falls
+// through the comparison that the group could have been asked about.
+func OffGroup(kind Kind) string {
+	if kind != Kind(7) {
+		return "generic"
+	}
+	return "impossible"
+}
+
+// InitBound binds the comparison in the if's OWN init statement — the stated
+// scope limitation, silent, beside the identical condition-borne sibling in
+// RenderIf above which is reported.
+func InitBound(kind Kind) string {
+	if isDef := kind == KindDef; isDef {
+		return "definition"
+	}
+	return "generic"
+}
+
+// Tagless discriminates in a tagless switch — out of scope here, and out of
+// exhaustive's scope too.
+func Tagless(kind Kind) string {
+	switch {
+	case kind == KindDef:
+		return "definition"
+	}
+	return "generic"
+}
