@@ -9,6 +9,14 @@
 // return generic }`) is a legitimate two-way split of a many-way domain, and
 // only the author knows which reading is intended. To bound the noise:
 //
+//   - the const group is DECLARED INSIDE THE ANALYZED MODULE. A foreign
+//     package's constants are not a domain this author governs: the group can
+//     gain a member from a Go release without the analyzed code changing, so
+//     the unhandled count is a number about somebody else's library and the
+//     prescribed switch is one the author cannot write. Every if-shaped
+//     comparison against a stdlib tag type in this suite is that shape — `tok
+//     == token.GOTO` asks "is this a goto?", a two-way question, over 90 token
+//     values — and answering it exhaustively would be worse code, not better;
 //   - BOTH operands share the constant's named type (comparing an error
 //     interface against a sentinel constant is a different rule's business);
 //   - the comparison STEERS an if or for condition — it is the condition, or
@@ -29,6 +37,21 @@
 // must BE an inhabitant — a comparison against a value the group does not
 // declare (a bitmask test, a duration, a zero value no member carries)
 // discriminates nothing in the group and is not reported.
+//
+// MODULE LOCALITY IS A DISABLEMENT CHANNEL and is recorded as one rather than
+// described as a virtue. The group's home is the package that DECLARES the
+// type, so an author can silence a real finding by moving the const group out
+// of the analyzed module — a nested go.mod and a `replace` directive do that
+// without leaving the repository. What it costs is a module boundary: a go.mod,
+// a require line and a dependency-manifest entry, each of which a reviewer and
+// an inventory can read. The honest remedy costs an exhaustive switch, which is
+// less work than the escape, so the cheapest silence here is the fix. What does
+// NOT buy silence: an alias (`type K = pkg.Kind` resolves to the declaring
+// package through types.Unalias), a defined type whose members the author
+// declares (they are declared in the author's package, which is local), and
+// moving the group to any other package of the same module (a module path is
+// matched as a whole path element, so example.test/mod does not swallow
+// example.test/modular).
 //
 // SCOPE LIMITATIONS, stated so silence is never mistaken for the analyzer
 // being broken. The comparison must be the condition itself. A comparison
@@ -63,7 +86,7 @@ const minimumMembers = 2
 // Analyzer reports if-shaped discrimination of multi-member const groups.
 var Analyzer = &analysis.Analyzer{
 	Name:     "enumdiscrim",
-	Doc:      "reports ==/!= control-flow discrimination of a const group with more than two members, the shape exhaustive cannot see",
+	Doc:      "reports ==/!= control-flow discrimination of an analyzed-module const group with more than two members, the shape exhaustive cannot see",
 	Requires: []*analysis.Analyzer{inspect.Analyzer},
 	Run:      run,
 }
@@ -141,10 +164,12 @@ func discriminations(pass *analysis.Pass, conditions []ast.Expr) []*discriminati
 
 // record adds the inhabitant cmp names to its group, opening the group on first
 // sight at cmp's position. A comparison against a value the group does not
-// declare names no inhabitant and opens nothing.
+// declare names no inhabitant and opens nothing, and a group declared outside
+// the analyzed module is refused before it is even counted — its size is a fact
+// about a library, not about a domain this author can close.
 func record(pass *analysis.Pass, found []*discrimination, cmp *ast.BinaryExpr) []*discrimination {
 	named, value, ok := comparedEnum(pass, cmp)
-	if !ok {
+	if !ok || !localToModule(pass, named.Obj().Pkg()) {
 		return found
 	}
 	if opened := lookup(found, named); opened != nil {

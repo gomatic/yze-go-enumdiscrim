@@ -2,6 +2,8 @@
 // discrimination silently drops any member added later.
 package a
 
+import "b"
+
 // Kind discriminates segment kinds.
 type Kind int
 
@@ -301,4 +303,48 @@ func Tagless(kind Kind) string {
 		return "definition"
 	}
 	return "generic"
+}
+
+// Foreign discriminates a const group declared in ANOTHER package: b.Tag has
+// three inhabitants and the comparison steers the if, so every other clause of
+// the rule is satisfied and only the module-locality refusal is holding it
+// silent. Delete the localToModule call in record and this line reports; it is
+// the same three-member shape as RenderIf above, which does report, so the
+// pair is the boundary in both directions.
+func Foreign(tag b.Tag) string {
+	if tag != b.TagOne {
+		return "generic"
+	}
+	return "one"
+}
+
+// ForeignChain leaves the same foreign group partly named across a chain — the
+// reported shape at ChainPartial, silent here for the one reason that differs.
+func ForeignChain(tag b.Tag) string {
+	if tag == b.TagOne {
+		return "one"
+	} else if tag == b.TagTwo {
+		return "two"
+	}
+	return "generic"
+}
+
+// Own is declared here and discriminated here: the positive half of the same
+// boundary, so a mutant that refuses every group — not merely the foreign ones
+// — takes this with it.
+type Own int
+
+// The own-module inhabitants.
+const (
+	OwnA Own = iota
+	OwnB
+	OwnC
+)
+
+// Owned discriminates the module's OWN group and is reported.
+func Owned(own Own) string {
+	if own != OwnA { // want `discriminates Own, a const group of 3 members`
+		return "generic"
+	}
+	return "a"
 }
