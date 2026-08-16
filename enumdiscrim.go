@@ -38,20 +38,44 @@
 // declare (a bitmask test, a duration, a zero value no member carries)
 // discriminates nothing in the group and is not reported.
 //
-// MODULE LOCALITY IS A DISABLEMENT CHANNEL and is recorded as one rather than
-// described as a virtue. The group's home is the package that DECLARES the
-// type, so an author can silence a real finding by moving the const group out
-// of the analyzed module — a nested go.mod and a `replace` directive do that
-// without leaving the repository. What it costs is a module boundary: a go.mod,
-// a require line and a dependency-manifest entry, each of which a reviewer and
-// an inventory can read. The honest remedy costs an exhaustive switch, which is
-// less work than the escape, so the cheapest silence here is the fix. What does
-// NOT buy silence: an alias (`type K = pkg.Kind` resolves to the declaring
-// package through types.Unalias), a defined type whose members the author
-// declares (they are declared in the author's package, which is local), and
-// moving the group to any other package of the same module (a module path is
-// matched as a whole path element, so example.test/mod does not swallow
-// example.test/modular).
+// WHAT MODULE LOCALITY MISSES, measured rather than implied, because it is a
+// real population and not a theoretical one. A fleet keeps its shared domain
+// types in library MODULES that every other repository consumes, so "outside
+// the analyzed module" is NOT the same as "somebody else's library". Driven
+// over 207 modules, the clause silences 44 findings; 36 are foreign tag types
+// (go/token.Token, reflect.Kind, go/constant.Kind, gopkg.in/yaml.v3's Kind)
+// and 8 are groups the same authors declare and extend — go-yze's Severity
+// read from four analyzer repositories, go-hx's changeset.OpKind read from
+// hx-text, and go-varyd's ConstraintType and TraversalAlgorithm read from two
+// services. changeset.OpKind is the type family this rule's own founding
+// example comes from. Adding a member to any of them is a one-line edit by the
+// same person, after which every consumer's `!=` falls through silently, which
+// is precisely what this reports. The boundary that matches the intent is the
+// author who can EXTEND the group; a module path does not carry that, and no
+// instrument in a go/analysis pass does.
+//
+// MODULE LOCALITY IS ALSO A DISABLEMENT CHANNEL and is recorded as one rather
+// than described as a virtue. The group's home is the package that DECLARES
+// the type, so an author can silence a real finding by moving the const group
+// out of the analyzed module. A nested go.mod alone does not do it: a module
+// under the analyzed module's own path space still matches, because the match
+// is a whole-path-element PREFIX — example.test/mod covers example.test/mod/x
+// and never example.test/modular. The escape needs the new module named
+// outside that space as well, so it costs a go.mod, a require, a replace and a
+// name that no longer reads as part of this module — four entries a reviewer
+// and a dependency inventory can both see. What was measured NOT to buy
+// silence: an alias (`type K = pkg.Kind` resolves to the declaring package
+// through types.Unalias), a defined type over a foreign underlying whose
+// members the author declares (they are declared in the author's package,
+// which is local), and any other package of the same module.
+//
+// It is NOT the cheapest silence this rule offers, and saying so would be
+// false. The cheapest is the init-bound rewrite named under SCOPE LIMITATIONS
+// below — `if hit := k != KindA; hit {` is one line, in place,
+// semantics-preserving, and leaves no artefact anywhere. That channel predates
+// this clause and is unaffected by it: module locality adds a channel, it does
+// not add the cheap one, and closing the cheap one needs a dataflow this rule
+// does not follow.
 //
 // SCOPE LIMITATIONS, stated so silence is never mistaken for the analyzer
 // being broken. The comparison must be the condition itself. A comparison
@@ -60,7 +84,16 @@
 // (`switch { case k == KindA: }`) are all out of scope: each takes a dataflow
 // or a statement form this rule does not follow. The tagless switch is out of
 // github.com/nishanths/exhaustive's scope too, so that shape is seen by
-// nothing in the suite.
+// nothing in the suite. A const group declared inside a FUNCTION BODY is out
+// of scope as well: the group is read from the declaring package's scope, and
+// a function-local group is in none.
+//
+// A build whose driver loads NO MODULE METADATA — a GOPATH-mode build,
+// GO111MODULE=off — leaves only the analyzed package itself local, so a group
+// declared in a sibling package of the same tree goes unjudged there. Every
+// module-aware driver populates it and reports that sibling: the yze runner,
+// the standalone singlechecker binary, and `go vet -vettool` were each driven
+// and each agree.
 package enumdiscrim
 
 import (

@@ -54,9 +54,12 @@ func exactValue(pass *analysis.Pass, expr ast.Expr) (string, bool) {
 // package and no member to the domain, and counting it would both cross the
 // threshold and state a falsehood in the message.
 //
-// A package-less named type needs no guard: (*types.Package).Scope() returns
-// the universe scope for a nil receiver, which holds no constant of any such
-// type, so the group is empty and the threshold refuses it.
+// A package-less named type is refused before this point: localToModule
+// answers false for a type no package declares, since such a type is in no
+// module. That refusal is the single answer for the case. The older reasoning
+// — that (*types.Package).Scope() returns the universe scope for a nil
+// receiver, so the group comes out empty and the threshold declines it — is
+// redundant beside it rather than a second justification.
 func memberValues(named *types.Named) map[string]struct{} {
 	scope := named.Obj().Pkg().Scope()
 	inhabitants := make(map[string]struct{})

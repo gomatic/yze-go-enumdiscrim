@@ -23,6 +23,7 @@ func TestLocalToModule(t *testing.T) {
 	root := types.NewPackage("example.test/mod", "mod")
 	other := types.NewPackage("example.test/other", "other")
 	modular := types.NewPackage("example.test/modular", "modular")
+	embedded := types.NewPackage("vendorhost.example/example.test/mod/kinds", "kinds")
 	mod := &analysis.Module{Path: "example.test/mod"}
 
 	assert.False(t, localToModule(&analysis.Pass{Pkg: self, Module: mod}, nil),
@@ -41,6 +42,8 @@ func TestLocalToModule(t *testing.T) {
 		"a foreign path is not local")
 	assert.False(t, localToModule(&analysis.Pass{Pkg: self, Module: mod}, modular),
 		"a module path matches whole path elements: example.test/mod does not swallow example.test/modular")
+	assert.False(t, localToModule(&analysis.Pass{Pkg: self, Module: mod}, embedded),
+		"the module path must be a PREFIX and not merely contained: a path that embeds it deeper is another module's")
 }
 
 // TestRecordJudgesByWhereTheGroupIsDeclared names the split the fix rests on,
